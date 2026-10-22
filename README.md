@@ -48,7 +48,16 @@ initial equity inputs). Locally: `PYTHONPATH=src python -m tools.paper_session
 --readme README.md`.
 
 <!-- paper:start -->
-_Paper trading has not run yet — trigger the workflow (or wait for the next 4-hour slot)._
+
+| Strategy | Equity | P&L | P&L % | Days (G/R) | Max DD | Fees |
+|---|---|---|---|---|---|---|
+| `all_in_one` (B) | $100,000.00 | +$0.00 | +0.00% | 1 (0/0) | +0.00% | $0.00 |
+| `rwa_positional` (A) | $99,126.58 | -$873.42 | -0.87% | 1 (0/1) | +0.00% | $22.11 |
+
+Full per-strategy **PnL calendar + daily stats** in [paper/REPORT.md](paper/REPORT.md).
+
+> Simulated fills on real market data, separate account per strategy; no real-money orders are ever sent.
+
 <!-- paper:end -->
 
 ## Safety gates
