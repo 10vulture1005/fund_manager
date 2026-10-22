@@ -8,7 +8,10 @@ absolutely zero orders sent.
 """
 from __future__ import annotations
 
+import json
+import logging
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, Optional
 
 from core.config import Config
@@ -33,6 +36,8 @@ from core.ports import ExecutionPort
 from delta.products import ProductCatalog
 from delta.rest import BASE_URLS, DeltaRestClient
 
+log = logging.getLogger("fm.paper")
+
 
 def _dec(v: Any) -> Optional[Decimal]:
     try:
@@ -54,10 +59,86 @@ class PaperPort(ExecutionPort):
         self.placed_orders: list[dict[str, Any]] = []  # dry-run audit trail
         # simulated account
         self.equity_sim = Decimal(str(cfg.flags.get("paper_initial_equity_usd", 100000)))
-        self.positions: dict[str, dict[str, Any]] = {}  # symbol -> {size, entry}
+        self.positions: dict[str, dict[str, Any]] = {}  # symbol -> {size, entry, mark}
+        # optional persistence so paper sessions (e.g. GitHub Actions) resume
+        # the simulated account instead of resetting it every run (spec 3.2)
+        self.state_path = cfg.flags.get("paper_state_path")
+        self._restore()
 
     async def bootstrap(self) -> None:
         await self.catalog.load()
+        self.save_state()
+
+    # ----------------------------------------------------- persistence
+    def _restore(self) -> None:
+        """Reload simulated equity + open positions from the last session.
+
+        A corrupted state file is discarded loudly and the account restarts
+        fresh: paper truth must never be quietly fudged.
+        """
+        if not self.state_path:
+            return
+        path = Path(self.state_path)
+        try:
+            data = json.loads(path.read_text())
+            self.equity_sim = Decimal(str(data.get("equity", self.equity_sim)))
+            self.positions = {
+                sym: {
+                    "size": int(p["size"]),
+                    "entry": Decimal(str(p["entry"])),
+                    "mark": _dec(p.get("mark")) or Decimal(str(p["entry"])),
+                }
+                for sym, p in (data.get("positions") or {}).items()
+            }
+            log.info("paper account restored from %s (equity=%s, %d positions)",
+                     path, self.equity_sim, len(self.positions))
+        except FileNotFoundError:
+            return
+        except Exception:
+            log.warning("paper state %s unusable — starting a fresh account", path)
+
+    def save_state(self) -> None:
+        """Atomically dump the simulated account (equity + positions)."""
+        if not self.state_path:
+            return
+        try:
+            path = Path(self.state_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            data = {
+                "saved_at": now_utc().isoformat(),
+                "equity": str(self.equity_sim),
+                "positions": {
+                    sym: {
+                        "size": int(p["size"]),
+                        "entry": str(p["entry"]),
+                        "mark": str(p.get("mark") or p["entry"]),
+                    }
+                    for sym, p in self.positions.items()
+                },
+            }
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(data, indent=2))
+            tmp.replace(path)
+        except Exception:
+            log.exception("paper state save failed (%s)", self.state_path)
+
+    def _contract_value(self, symbol: str) -> Decimal:
+        prod = self.catalog.get(symbol)
+        return prod.contract_value if prod else Decimal("1")
+
+    def unrealized_pnl(self) -> Decimal:
+        """Mark-to-market PnL over currently open positions (mark vs entry)."""
+        pnl = Decimal("0")
+        for sym, p in self.positions.items():
+            size, entry, mark = int(p["size"]), p["entry"], p.get("mark")
+            if not size or mark is None:
+                continue
+            pnl += Decimal(size) * (mark - entry) * self._contract_value(sym)
+        return pnl
+
+    def mark_to_market_equity(self) -> Decimal:
+        """Cash equity adjusted for unrealized PnL of open positions."""
+        return self.equity_sim + self.unrealized_pnl()
 
     # ----- market data (all real) ---------------------------------------------
     async def product(self, symbol: str) -> Optional[ProductInfo]:
@@ -189,6 +270,7 @@ class PaperPort(ExecutionPort):
                 "fee": str(fee),
             }
         )
+        self.save_state()
         return OrderResult(
             client_order_id=intent.client_order_id,
             accepted=True,

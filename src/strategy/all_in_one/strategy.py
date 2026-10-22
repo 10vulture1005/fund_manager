@@ -22,7 +22,7 @@ from typing import Any, Optional
 
 from core.events import EventLogger, setup_logging
 from core.ledger import LIFOLedger
-from core.models import Candle, Event as EvKind, FillEvent, Ticker
+from core.models import Candle, Event as EvKind, FillEvent, Ticker, now_utc
 from core.ports import ExecutionPort, StrategyPort
 from core.state import DeltaSchema, now_iso
 from strategy.all_in_one.allocation import Allocator
@@ -57,6 +57,8 @@ class AllInOneStrategy(StrategyPort):
         self.portfolio: Optional[PortfolioManager] = None
         self.sleeves: dict[str, Any] = {}
         self.resolved_symbols: dict[str, list[str]] = {}
+        # clock used on_daily_close / portfolio re-checks; override in tests
+        self._now = now_utc
         self._last_account: Optional[Any] = None
         self._last_equity: Optional[float] = None
         self._last_hour: Optional[str] = None

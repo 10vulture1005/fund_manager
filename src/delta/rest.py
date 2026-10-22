@@ -32,6 +32,11 @@ BASE_URLS = {
     "testnet": "https://cdn-ind.testnet.deltaex.org",
 }
 
+# Internal configs/strategies name timeframes `1H/2H/4H/6H/1D/1W`; the live
+# candles endpoint (TODO(VERIFY)) only accepts the lowercase set
+# `5s,1m,3m,5m,15m,30m,1h,2h,4h,6h,1d,1w`. Map once here, in one place.
+_RESOLUTION_ALIASES = {"1H": "1h", "2H": "2h", "4H": "4h", "6H": "6h", "1D": "1d", "1W": "1w"}
+
 logger = logging.getLogger(__name__)
 
 
@@ -132,7 +137,8 @@ class DeltaRestClient:
         """
         raw_body = encode_json_body(body) if body is not None else ""
         headers = self.signer.signed_headers(method, path, query_string, raw_body)
-        url = "/v2" + path
+        # spec 1.2: send the exact request line that was signed
+        url = "/v2" + path + query_string
         await self.limiter.acquire(
             weight=weight, method=method, path="/v2" + path, product_id=product_id, ops=ops
         )
@@ -214,7 +220,7 @@ class DeltaRestClient:
         out: list[Any] = []
         cursor: str | int | None = None
         for _ in range(_PAGE_LIMIT):
-            qs_params = dict(params)
+            qs_params = {k: v for k, v in params.items() if v not in (None, "")}
             qs_params["page_size"] = page_size
             if cursor is not None:
                 qs_params["after"] = cursor
@@ -294,9 +300,13 @@ class DeltaRestClient:
         """GET /history/candles — (symbol, resolution, start, end) in SECONDS
         (spec 1.3/1.5). Returns newest→oldest candles.
 
+        Internal timeframe ids (`1H/4H/1D`, …) are mapped to the lowercase set
+        the live API accepts — see _RESOLUTION_ALIASES above.
+
         TODO(VERIFY): confirm param names (`resolution`, `start`, `end`) and
         that these are seconds, not microseconds, in the live docs.
         """
+        resolution = _RESOLUTION_ALIASES.get(resolution, resolution)
         qs = self._q(
             {
                 "symbol": symbol,

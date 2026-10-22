@@ -23,6 +23,34 @@ Execution ports — the identical strategy code runs in every mode (spec 3.2):
 > ⚠️ Not financial advice; leveraged derivatives can lose more than the
 > deposit. Defaults are testnet/paper and small size. See `ASSUMPTIONS.md`.
 
+## Paper trading on GitHub Actions (real data, simulated fills, no keys)
+
+A scheduled workflow runs a **bounded paper session** every 4 hours
+(`.github/workflows/paper.yml`) with a job per strategy — **A**
+(`rwa_positional`) and **B** (`all_in_one`), as *matrix* jobs. Both use the
+same strategy + port code as `--mode paper`, driven from **real Delta market
+data** with **simulated fills** and **zero orders sent**. No API keys or
+GitHub secrets are required. Each job journals to its own dir and commits it
+back, so the simulated equity, open positions and strategy campaigns survive
+restarts — and **strategies A and B keep fully separate simulated accounts
+and PnL**:
+
+| Dir | What's in it |
+| --- | --- |
+| `paper/REPORT.md` | Combined report: summary table, then **PnL calendar + daily stats per strategy** |
+| `paper/<strategy>/daily.csv` | day-anchored snapshots: MTM equity, day PnL, fees, positions |
+| `paper/<strategy>/trades.csv` | append-only fill journal |
+| `paper/<strategy>/paper_state.json`, `paper/<strategy>/*.db*` | simulated account + strategy state |
+
+Manual run: **Actions → paper-trading → Run workflow** (strategies / minutes /
+initial equity inputs). Locally: `PYTHONPATH=src python -m tools.paper_session
+--strategy rwa_positional` then `python -m tools.paper_report --out-dir paper
+--readme README.md`.
+
+<!-- paper:start -->
+_Paper trading has not run yet — trigger the workflow (or wait for the next 4-hour slot)._
+<!-- paper:end -->
+
 ## Safety gates
 
 - `env: prod` requires the CLI flag `--i-understand-this-is-live`.
