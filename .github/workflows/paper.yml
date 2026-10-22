@@ -73,7 +73,8 @@ jobs:
         if: matrix.strategy == 'all_in_one'  # after the other leg's commit lands
         run: |
           sleep 20  # small grace for the sibling leg's push
-          git pull --rebase origin "$GITHUB_REF_NAME"
+          # session may have left uncommitted journal/state files → autostash them
+          git pull --rebase --autostash origin "$GITHUB_REF_NAME"
           PYTHONPATH=src python -m tools.paper_report --out-dir paper --readme README.md
 
       - name: Commit journal + report
@@ -85,6 +86,6 @@ jobs:
             echo "no changes to commit"
           else
             git commit -m "paper(${{ matrix.strategy }}): session update $(date -u +%FT%TZ) [skip ci]"
-            git pull --rebase origin "$GITHUB_REF_NAME" || true
+            git pull --rebase --autostash origin "$GITHUB_REF_NAME" || true
             git push
           fi
