@@ -1,0 +1,14 @@
+# Paste the leader's published stats here. The backtest `calibrate` command
+# compares its results against these metrics and reports deltas.
+# All optional; unknown keys are ignored.
+metrics:
+  roi: null              # e.g. 0.35 for 35% over period
+  win_rate: null         # e.g. 0.62
+  max_drawdown: null     # e.g. -0.18
+  sharpe: null
+  profit_factor: null
+  average_holding_time_hours: null
+instruments: []          # e.g. [XAUTUSD, PAXGUSD, SLVONUSD, ETHUSD, BTCUSD]
+notes: >
+  Prompt specs are inferred from a public marketing description, not the
+  leader's real rules. Calibration cannot claim to reproduce the leader.

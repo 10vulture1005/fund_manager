@@ -1,0 +1,156 @@
+# fund-manager shared configuration — Delta Exchange India
+# Anything you must fill yourself before LIVE trading is tagged [ASK] in the
+# prompt specs and defaults to null here. Testnet is the default env.
+# Secrets: prefer env vars DELTA_API_KEY / DELTA_API_SECRET over this file.
+
+env: testnet            # testnet | prod  (prod needs --i-understand-this-is-live)
+mode: paper             # backtest | paper | live
+state_dir: state
+data_dir: data
+log_dir: logs
+
+api:
+  env: testnet
+  api_key: ""           # from demo.delta.exchange (testnet) or prod console
+  api_secret: ""
+  prod_rest: https://api.india.delta.exchange        # NEVER api.delta.exchange
+  testnet_rest: https://cdn-ind.testnet.deltaex.org
+  prod_ws: wss://socket.india.delta.exchange
+  testnet_ws: wss://socket.ind.testnet.deltaex.org
+
+notifications:
+  telegram_bot_token: null
+  telegram_chat_id: null
+
+execution:
+  dry_run_log: true        # log every intended order as structured JSON first
+  kill_flatten: false      # KILL file / SIGTERM: also flatten positions?
+  reconcile_on_start: true
+
+# ---------------------------------------------------------------------------
+# Strategy A — RWA Metals & Energy — Positional (prompt_A_rwa_positional.md)
+# ---------------------------------------------------------------------------
+rwa_positional:
+  symbols: ["XAUTUSD", "PAXGUSD", "SLVONUSD"]   # verified live at startup
+  energy_scan: true
+  recommended_margin: null         # [ASK] leader's "Recommended Margin" value
+  min_turnover_usd: null           # [ASK] liquidity floor (24h turnover)
+  leverage: null                   # [ASK] reference leader's recommended margin
+  margin_mode: null                # [ASK] cross | isolated
+  max_leverage: 10
+  campaign_margin_pct: 0.15
+  campaign_risk_pct: 0.01
+  rungs: 4
+  rung_weights: [0.25, 0.25, 0.25, 0.25]
+  martingale_multiplier: 1.0
+  ladder_mode: against
+  ladder_atr_mult: [0.6, 1.2, 1.8]
+  sweep_min_atr: 0.10
+  reclaim_bars: 3
+  allow_countertrend: false
+  min_zone_score: 2
+  max_spread_pct: 0.10
+  cooldown_bars: 6
+  entry_timeout_s: 20
+  rung_ttl_hours: 72
+  max_campaign_days: 14
+  profit_target_pct_of_margin: 0.20
+  tp_close_fraction: 1.0
+  trail_atr_mult: 2.0
+  max_concurrent_campaigns: 3
+  max_total_margin_pct: 0.40
+  max_daily_loss_pct: 0.03
+  max_drawdown_pct: 0.10
+  max_campaigns_per_bucket: 1      # XAUT/PAXG gold-bucket rule
+
+# ---------------------------------------------------------------------------
+# Strategy B — All-in-One Delta Trades — Multi-Strategy (prompt_B_all_in_one.md)
+# ---------------------------------------------------------------------------
+all_in_one:
+  sleeve_symbols:
+    eth_cc: ["ETHUSD"]
+    btc_cp: ["BTCUSD"]
+    gold: ["XAUTUSD", "PAXGUSD"]
+  stock_discovery_patterns: ["XUSD"]   # rough; verified against /products
+  hedge_style: standard            # standard covered call/put definition
+  lot_tp_pct:
+    eth_cc: 2.0
+    btc_cp: 2.0
+    gold_cc: 1.0
+    gold_cp: 1.0
+  lot_spacing_atr:
+    eth_cc: 1.0
+    btc_cp: 1.0
+    gold: 0.8
+  # [ASK] explicit lot budgets (strategy refuses live while null)
+  eth_cc:
+    lot_size_notional: null        # [ASK] USD notional per lot share
+    max_lots: 5
+    sleeve_leverage_cap: 3
+    sleeve_stop_pct: 15
+  btc_cp:
+    lot_size_notional: null        # [ASK]
+    max_lots: 4
+    sleeve_leverage_cap: 2
+    sleeve_stop_pct: 15
+  gold:
+    lot_size_notional: null        # [ASK]
+    max_lots: 5                    # shared across XAUT + PAXG
+    sleeve_leverage_cap: 3
+    sleeve_stop_pct: 15
+    mode_switch_days: 3
+  stocks:
+    stock_symbols: null            # [ASK] e.g. [NVDAXUSD, TSLAXUSD, AAPLXUSD, ...]
+    lot_size_notional: null        # [ASK]
+    max_stock_symbols: 6
+    stock_max_lots: 5
+    stock_leverage_cap: 2
+    stock_symbol_stop_pct: 25
+    dd_entry_pct: 8
+    dd_lookback_days: 30
+    rsi_accumulate: 40
+    rsi_distribute_floor: 60
+    lot_spacing_pct: 5
+    max_lots_sold_per_day: 1
+    min_lot_profit_pct: 3
+  options:
+    opt_target_delta: 0.20
+    opt_delta_band: [0.12, 0.30]
+    opt_min_dte: 5
+    opt_max_dte: 10
+    opt_max_spread_pct: 0.08
+    opt_min_oi: 100
+    coverage_ratio: 1.0
+    opt_reprice_s: 10
+    opt_max_reprices: 6
+    opt_buyback_capture_pct: 80
+    opt_roll_delta: 0.45
+  allocation:
+    strategy_capital_usd: null     # [ASK] capital dedicated to THIS strategy only
+    cash_reserve_pct: 20
+    base_weights:
+      eth_cc: null                 # [ASK] e.g. 30
+      btc_cp: null                 # [ASK] e.g. 20
+      gold: null                   # [ASK] e.g. 25
+      stocks: null                 # [ASK] e.g. 25
+    w_min_pct: 5
+    w_max_pct: 40
+  risk:
+    max_gross_notional_to_equity: 3.0
+    max_margin_utilisation_pct: 50
+    min_liq_distance_pct: 25
+    max_daily_loss_pct: 3
+    max_drawdown_pct: 12
+    derisk_steps: 3
+    high_vol_percentile: 85
+  margin_mode_check_interval_min: 60   # hourly cross-margin re-check (2.3)
+
+backtest:
+  symbol: XAUTUSD
+  resolution: 1m
+  months: 14
+  initial_equity_usd: 10000
+  slippage_bps: 2
+  funding_bps_per_8h: 1.0
+  touch_fill_prob: 0
+  strategy: rwa_positional          # rwa_positional | all_in_one
