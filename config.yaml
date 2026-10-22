@@ -38,8 +38,8 @@ rwa_positional:
   leverage: null                   # [ASK] reference leader's recommended margin
   margin_mode: null                # [ASK] cross | isolated
   max_leverage: 10
-  campaign_margin_pct: 0.15
-  campaign_risk_pct: 0.01
+  campaign_margin_pct: 15.0        # percent (code convention: value/100 applied)
+  campaign_risk_pct: 1.0
   rungs: 4
   rung_weights: [0.25, 0.25, 0.25, 0.25]
   martingale_multiplier: 1.0
@@ -54,7 +54,7 @@ rwa_positional:
   entry_timeout_s: 20
   rung_ttl_hours: 72
   max_campaign_days: 14
-  profit_target_pct_of_margin: 0.20
+  profit_target_pct_of_margin: 20.0
   tp_close_fraction: 1.0
   trail_atr_mult: 2.0
   max_concurrent_campaigns: 3

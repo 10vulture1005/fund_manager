@@ -144,13 +144,18 @@ async def download_candles(
     if httpx is None:
         raise RuntimeError("httpx required for downloads")
     step = RESOLUTIONS.get(resolution, 60) * 60
+    # prod API wants lowercase resolutions (1h/4h/1d) and caps at 4000 rows per
+    # request; testnet accepted "1H" style (TODO(VERIFY) — confirmed empirically
+    # 2026-10-22 via a 400 `bad_schema` response from prod).
+    label = resolution if "testnet" in rest_base else resolution.lower()
+    BARS_PER_REQUEST = 4000
     results: list[Candle] = []
     async with httpx.AsyncClient(base_url=rest_base, timeout=30, headers={"User-Agent": "fm-backtest/0.1"}) as cli:
         chunk_start = int(start.timestamp())
         end_s = int(end.timestamp())
         while chunk_start < end_s:
-            chunk_end = min(chunk_start + step * 5000, end_s)
-            url = f"/v2/history/candles?symbol={symbol}&resolution={resolution}&start={chunk_start}&end={chunk_end}"
+            chunk_end = min(chunk_start + step * BARS_PER_REQUEST, end_s)
+            url = f"/v2/history/candles?symbol={symbol}&resolution={label}&start={chunk_start}&end={chunk_end}"
             r = await cli.get(url)
             if r.status_code != 200:
                 break
@@ -171,5 +176,7 @@ async def download_candles(
                     )
                 )
             chunk_start = chunk_end
+    # prod returns rows newest-first; the engine replays chronologically.
+    results.sort(key=lambda c: c.ts)
     save_candles(data_path(out_dir, symbol, resolution), results)
     return results

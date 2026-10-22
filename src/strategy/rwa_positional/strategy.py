@@ -854,6 +854,18 @@ class RwaPositionalStrategy(StrategyPort):
         state = self.sm.state_of(sym)
         if state in ("EXITING", "COOLDOWN", "HALTED"):
             return
+        if state == "TRIGGERED":
+            # Nothing has filled yet (spec 2.12: TRIGGERED -> EXITING is not a
+            # legal transition). Cancel the resting rung orders, close the
+            # still-empty campaign and go straight back to IDLE.
+            await self._cancel_unfilled_rungs(rt)
+            self.ledger.close_campaign(cam.id, close_reason=reason)
+            rt.campaign = None
+            rt.campaign_id = None
+            self.sm.transition(sym, "IDLE", features={"reason": reason})
+            self.events.log("exit", f"triggered-phase exit (no fills): {reason}",
+                            symbol=sym, features={"reason": reason})
+            return
         self.sm.transition(sym, "EXITING", features={"reason": reason})
         self.ledger.update_campaign(cam.id, state="EXITING",
                                     meta=campaign_to_meta(cam))

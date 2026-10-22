@@ -23,6 +23,7 @@ from core.models import (
     FillEvent,
     OrderIntent,
     OrderRecord,
+    OrderResult,
     OrderStatus,
     OrderType,
     PositionSnapshot,
@@ -209,7 +210,16 @@ class BacktestPort(ExecutionPort):
             self._fill(bt, int(intent.size), fill_px)
         else:
             self.resting[intent.client_order_id] = bt
-        return dict(rec=rec, accepted=True)
+        # paper/live ports return OrderResult (port contract, spec 3.2);
+        # backtest must match — the strategy reads res.filled_size etc.
+        return OrderResult(
+            client_order_id=rec.client_order_id,
+            accepted=True,
+            order_id=rec.client_order_id,
+            status=rec.status,
+            filled_size=int(rec.filled_size),
+            avg_fill_price=getattr(rec, "avg_fill_price", None),
+        )
 
     async def cancel(self, client_order_id: str, symbol: str) -> bool:
         return self.resting.pop(client_order_id, None) is not None or True

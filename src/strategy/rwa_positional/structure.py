@@ -143,13 +143,23 @@ def structure_exit(
 ) -> bool:
     """Structure exit (spec 2.8): a 4H close beyond the zone TOGETHER WITH a
     CHoCH against the position -> close the whole campaign."""
-    if not candles_4h:
+    if not candles_4h or zone is None:
+        return False
+    # accept either a zone object (.lower/.upper) or a Campaign
+    # (.zone_lower/.zone_upper)
+    lo = getattr(zone, "zone_lower", None)
+    if lo is None:
+        lo = getattr(zone, "lower", None)
+    hi = getattr(zone, "zone_upper", None)
+    if hi is None:
+        hi = getattr(zone, "upper", None)
+    if lo is None or hi is None:
         return False
     close = float(candles_4h[-1].close)
     if side == "long":
-        beyond = close < zone.lower
+        beyond = close < lo
         flipped = choch_against(candles_4h, "long", left, right)
     else:
-        beyond = close > zone.upper
+        beyond = close > hi
         flipped = choch_against(candles_4h, "short", left, right)
     return bool(beyond and flipped)

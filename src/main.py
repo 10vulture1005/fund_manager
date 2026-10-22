@@ -216,8 +216,11 @@ async def cmd_backtest(cfg: Config) -> None:
         log.info("using cached candles %s", path)
         candles = load_candles(path, symbol, resolution)
     else:
+        # candle history always comes from prod: it's a public endpoint and the
+        # testnet CDN serves synthetic candles (huge anomalous wicks, limited
+        # depth) that make risk sizing skip every signal.
         candles = await download_candles(
-            cfg.api.rest_base, symbol, resolution, start, end, cfg.data_dir
+            cfg.api.prod_rest, symbol, resolution, start, end, cfg.data_dir
         )
     if not candles:
         log.error("no candles for %s %s — cannot run backtest", symbol, resolution)
